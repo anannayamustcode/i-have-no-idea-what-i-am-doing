@@ -134,7 +134,7 @@ export class Game extends Phaser.Scene {
     hitBomb(player, bomb) {
         this.physics.pause();
         player.setTint(0xff0000);
-        player.anims.play('turn');
+        // player.anims.play('turn');
         this.time.delayedCall(2000, () => {
             this.scene.start('GameOver');
         });
