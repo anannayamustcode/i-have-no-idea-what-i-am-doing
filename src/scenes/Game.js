@@ -21,6 +21,9 @@ export class Game extends Phaser.Scene {
         this.physics.add.collider(this.player, this.platforms);
         this.cursors = this.input.keyboard.createCursorKeys();
 
+        // Touch controls setup
+        this.setupTouchControls();
+
         // Score
         this.score = 0;
         this.scoreText = this.add.text(16, 16, 'Score: 0', { 
@@ -68,16 +71,93 @@ export class Game extends Phaser.Scene {
         this.physics.add.collider(this.player, this.bombs, this.hitBomb, null, this);
     }
 
+    setupTouchControls() {
+        // Touch control variables
+        this.touchStartTime = 0;
+        this.longPressThreshold = 200; // milliseconds for long press
+        this.isLongPressing = false;
+        this.touchDirection = null;
+        this.longPressTimer = null;
+
+        // Add touch input listeners
+        this.input.on('pointerdown', (pointer) => {
+            // Don't interfere with scroll or letter interactions
+            if (this.scroll.getBounds().contains(pointer.x, pointer.y) || 
+                (this.letterVisible && this.letter.getBounds().contains(pointer.x, pointer.y))) {
+                return;
+            }
+
+            this.touchStartTime = this.time.now;
+            this.isLongPressing = false;
+            
+            // Determine touch direction based on screen position
+            if (pointer.x < this.scale.width / 2) {
+                this.touchDirection = 'left';
+            } else {
+                this.touchDirection = 'right';
+            }
+
+            // Start long press timer
+            this.longPressTimer = this.time.delayedCall(this.longPressThreshold, () => {
+                this.isLongPressing = true;
+            });
+        });
+
+        this.input.on('pointerup', (pointer) => {
+            // Don't interfere with scroll or letter interactions
+            if (this.scroll.getBounds().contains(pointer.x, pointer.y) || 
+                (this.letterVisible && this.letter.getBounds().contains(pointer.x, pointer.y))) {
+                return;
+            }
+
+            const touchDuration = this.time.now - this.touchStartTime;
+            
+            // Clear long press timer
+            if (this.longPressTimer) {
+                this.longPressTimer.remove();
+                this.longPressTimer = null;
+            }
+
+            // If it was a quick tap (not a long press), jump
+            if (touchDuration < this.longPressThreshold && !this.isLongPressing) {
+                this.player.jump();
+            }
+
+            // Reset touch state
+            this.isLongPressing = false;
+            this.touchDirection = null;
+        });
+
+        // Handle pointer leave (when finger moves off screen)
+        this.input.on('pointerout', () => {
+            if (this.longPressTimer) {
+                this.longPressTimer.remove();
+                this.longPressTimer = null;
+            }
+            this.isLongPressing = false;
+            this.touchDirection = null;
+        });
+    }
+
     update() {
-        // Player controls
-        if (this.cursors.left.isDown) {
+        // Handle keyboard controls
+        let keyboardLeft = this.cursors.left.isDown;
+        let keyboardRight = this.cursors.right.isDown;
+        
+        // Handle touch controls
+        let touchLeft = this.isLongPressing && this.touchDirection === 'left';
+        let touchRight = this.isLongPressing && this.touchDirection === 'right';
+
+        // Player movement (keyboard or touch)
+        if (keyboardLeft || touchLeft) {
             this.player.moveLeft();
-        } else if (this.cursors.right.isDown) {
+        } else if (keyboardRight || touchRight) {
             this.player.moveRight();
         } else {
             this.player.idle();
         }
 
+        // Keyboard jump
         if (this.cursors.up.isDown && this.player.body.blocked.down) {
             this.player.jump();
         }
